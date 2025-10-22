@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { createSite, getSiteByUrl, createSelector } from "@/lib/db-operations"
+import { analyzeWebsiteHTML } from "@/lib/server-pattern-analyzer"
 
 export async function POST(request: NextRequest) {
   try {
@@ -20,8 +21,7 @@ export async function POST(request: NextRequest) {
       site = await createSite(url, domain)
     }
 
-    // Simulate selector discovery with different results based on domain
-    const selectors = generateSelectorsForDomain(domain)
+    const selectors = await analyzeWebsite(url)
 
     // Save discovered selectors to database
     const savedSelectors = []
@@ -42,41 +42,34 @@ export async function POST(request: NextRequest) {
   }
 }
 
-function generateSelectorsForDomain(domain: string) {
-  const domainPatterns: Record<string, Array<{ type: string; value: string; confidence: number }>> = {
-    "amazon.com": [
-      { type: "container", value: 'div[data-component-type="s-search-result"]', confidence: 0.95 },
-      { type: "title", value: "h2 a span", confidence: 0.92 },
-      { type: "price", value: ".a-price-whole", confidence: 0.88 },
-      { type: "image", value: "img.s-image", confidence: 0.9 },
-    ],
-    "ebay.com": [
-      { type: "container", value: "div.s-item", confidence: 0.94 },
-      { type: "title", value: ".s-item__title", confidence: 0.91 },
-      { type: "price", value: ".s-item__price", confidence: 0.89 },
-      { type: "image", value: ".s-item__image-wrapper img", confidence: 0.92 },
-    ],
-    "walmart.com": [
-      { type: "container", value: 'div[data-testid="ProductTile"]', confidence: 0.93 },
-      { type: "title", value: 'a[data-testid="productTitle"]', confidence: 0.9 },
-      { type: "price", value: 'div[data-testid="productPrice"]', confidence: 0.87 },
-      { type: "image", value: 'img[data-testid="productImage"]', confidence: 0.91 },
-    ],
-    "target.com": [
-      { type: "container", value: 'div[data-test="ProductCardWrapper"]', confidence: 0.92 },
-      { type: "title", value: 'a[data-test="productTitle"]', confidence: 0.89 },
-      { type: "price", value: 'span[data-test="productPrice"]', confidence: 0.86 },
-      { type: "image", value: 'img[data-test="productImage"]', confidence: 0.9 },
-    ],
-  }
+async function analyzeWebsite(url: string) {
+  try {
+    const response = await fetch(url, {
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+      },
+      timeout: 10000,
+    })
 
-  // Return domain-specific selectors or generic ones
-  return (
-    domainPatterns[domain] || [
-      { type: "container", value: "div.product-item", confidence: 0.75 },
-      { type: "title", value: "h2.product-title", confidence: 0.72 },
-      { type: "price", value: "span.product-price", confidence: 0.7 },
-      { type: "image", value: "img.product-image", confidence: 0.73 },
-    ]
-  )
+    if (!response.ok) {
+      throw new Error(`Failed to fetch URL: ${response.statusText}`)
+    }
+
+    const html = await response.text()
+    const results = await analyzeWebsiteHTML(html)
+
+    if (results.length === 0) {
+      console.warn("[v0] No selectors found, returning empty results")
+    }
+
+    return results.map((result) => ({
+      type: result.type,
+      value: result.value,
+      confidence: result.confidence,
+    }))
+  } catch (error) {
+    console.error("Website analysis error:", error)
+    return []
+  }
 }
