@@ -1,5 +1,3 @@
-import fetch from "node-fetch"
-
 const SCRAPINGBEE_API_KEY = "W4CVB5OA3OP77B1BVSCIQKTN9689BE4BCE0AAF5NEVMWUC8L86YNYG184G07WI99ZT8L706TG2716NIE"
 const SCRAPINGBEE_API_URL = "https://api.scrapingbee.com/api/v1/"
 
@@ -37,7 +35,8 @@ export async function fetchWithScrapingBee(url: string): Promise<string> {
 
     return data.body
   } catch (error) {
-    console.error("[v0] ScrapingBee fetch error:", error)
-    throw error
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    console.error("[v0] ScrapingBee fetch error:", errorMessage)
+    throw new Error(`ScrapingBee failed: ${errorMessage}`)
   }
 }

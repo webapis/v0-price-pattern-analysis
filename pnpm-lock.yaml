@@ -132,7 +132,7 @@ importers:
         specifier: ^0.4.6
         version: 0.4.6(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
       node-fetch:
-        specifier: latest
+        specifier: 3.3.2
         version: 3.3.2
       puppeteer:
         specifier: 24.26.0
