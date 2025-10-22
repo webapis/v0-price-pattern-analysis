@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { createSite, getSiteByUrl, createSelector } from "@/lib/db-operations"
 import { analyzeWebsiteHTML } from "@/lib/server-pattern-analyzer"
+import { fetchWithScrapingBee } from "@/lib/scrapingbee-client"
 
 export async function POST(request: NextRequest) {
   try {
@@ -44,19 +45,27 @@ export async function POST(request: NextRequest) {
 
 async function analyzeWebsite(url: string) {
   try {
-    const response = await fetch(url, {
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
-      },
-      timeout: 10000,
-    })
+    let html: string
+    try {
+      html = await fetchWithScrapingBee(url)
+    } catch (scrapingBeeError) {
+      console.warn("[v0] ScrapingBee failed, falling back to direct fetch:", scrapingBeeError)
+      // Fallback to direct fetch if ScrapingBee fails
+      const response = await fetch(url, {
+        headers: {
+          "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+        },
+        timeout: 10000,
+      })
 
-    if (!response.ok) {
-      throw new Error(`Failed to fetch URL: ${response.statusText}`)
+      if (!response.ok) {
+        throw new Error(`Failed to fetch URL: ${response.statusText}`)
+      }
+
+      html = await response.text()
     }
 
-    const html = await response.text()
     const results = await analyzeWebsiteHTML(html)
 
     if (results.length === 0) {
